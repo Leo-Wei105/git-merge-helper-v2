@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.gitmergehelper.plugin</id>
     <name>Git合并助手</name>
-    <vendor email="1124822400@qq.com" url="https://github.com/gitmergehelper">Git Merge Helper Team</vendor>
+    <vendor email="1124822400@qq.com" url="https://github,com/Leo-Wei105/git-merge-helper-v2.git">Git Merge Helper Team</vendor>
     <icon>icons/icon.png</icon>
 
     <description><![CDATA[

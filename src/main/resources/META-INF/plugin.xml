@@ -27,6 +27,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h4>版本 1.1.0</h4>
+        <ul>
+            <li>功能优化和改进</li>
+            <li>提升用户体验</li>
+            <li>Bug修复和性能优化</li>
+        </ul>
         <h4>版本 1.0.0</h4>
         <ul>
             <li>初始版本发布</li>

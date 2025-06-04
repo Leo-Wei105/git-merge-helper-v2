@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Created-By: Gradle 7.6.3
+Build-JVM: 24.0.1 (Oracle Corporation 24.0.1+9-30)
+Version: 1.0.0
+Build-Plugin: Gradle IntelliJ Plugin
+Build-Plugin-Version: 1.13.3
+Build-OS: Windows 11 10.0 amd64
+Build-SDK: IC-2023.2
+

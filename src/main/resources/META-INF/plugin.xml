@@ -1,0 +1,112 @@
+<idea-plugin>
+    <id>com.gitmergehelper.plugin</id>
+    <name>Git合并助手</name>
+    <vendor email="1124822400@qq.com" url="https://github.com/gitmergehelper">Git Merge Helper Team</vendor>
+    <icon>icons/icon.png</icon>
+
+    <description><![CDATA[
+        <h3>Git合并助手 - 自动化Git分支合并流程</h3>
+        <p>一个强大的Git分支合并工具，帮助开发者自动化复杂的分支合并流程，提高开发效率。</p>
+        
+        <h4>主要功能：</h4>
+        <ul>
+            <li>🚀 <strong>自动化分支合并</strong> - 一键完成Feature分支到目标分支的完整合并流程</li>
+            <li>⚡ <strong>快速提交合并</strong> - 快速提交未提交的更改并继续合并流程</li>
+            <li>🔍 <strong>智能分支检测</strong> - 根据配置的命名规则自动识别功能分支</li>
+            <li>🛠️ <strong>冲突处理</strong> - 智能检测和处理Git合并冲突</li>
+            <li>⚙️ <strong>灵活配置</strong> - 支持自定义主分支、目标分支和分支命名规则</li>
+            <li>🔒 <strong>安全可靠</strong> - 完善的环境验证和并发控制机制</li>
+        </ul>
+        
+        <h4>使用方式：</h4>
+        <ul>
+            <li>命令面板：<kbd>Ctrl+Shift+P</kbd> 搜索 "Git合并"</li>
+            <li>右键菜单：在项目树或编辑器中右键选择Git合并选项</li>
+            <li>Git工具栏：点击Git面板中的合并助手按钮</li>
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h4>版本 1.0.0</h4>
+        <ul>
+            <li>初始版本发布</li>
+            <li>实现自动化分支合并功能</li>
+            <li>支持快速提交合并</li>
+            <li>添加智能分支检测</li>
+            <li>实现合并冲突处理</li>
+            <li>提供完整的配置管理系统</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- 插件依赖 -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+
+    <!-- 插件扩展点 -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- 应用级配置 -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.gitmergehelper.settings.GitMergeHelperConfigurable"
+                id="com.gitmergehelper.settings"
+                displayName="Git合并助手"/>
+                
+        <!-- 应用服务 -->
+        <applicationService serviceImplementation="com.gitmergehelper.services.GitMergeHelperSettings"/>
+        <applicationService serviceImplementation="com.gitmergehelper.services.GitMergeService"/>
+        
+        <!-- 项目服务 -->
+        <projectService serviceImplementation="com.gitmergehelper.services.ProjectConfigService"/>
+        
+        <!-- 通知组 -->
+        <notificationGroup id="Git Merge Helper" displayType="BALLOON"/>
+    </extensions>
+
+    <!-- 操作定义 -->
+    <actions>
+        <!-- 主菜单组 -->
+        <group id="GitMergeHelperGroup" text="Git合并助手" popup="true">
+            <add-to-group group-id="VcsGroups" anchor="last"/>
+            
+            <!-- 主要操作 -->
+            <action id="GitMergeHelper.AutoMerge"
+                    class="com.gitmergehelper.actions.AutoMergeAction"
+                    text="自动合并分支"
+                    description="执行完整的自动化分支合并流程">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift M"/>
+            </action>
+            
+            <action id="GitMergeHelper.QuickCommit"
+                    class="com.gitmergehelper.actions.QuickCommitAction"
+                    text="快速提交并合并"
+                    description="快速提交当前更改并可选择继续合并"/>
+                    
+            <separator/>
+            
+            <!-- 配置操作 -->
+            <action id="GitMergeHelper.ShowStatus"
+                    class="com.gitmergehelper.actions.ShowStatusAction"
+                    text="查看状态"
+                    description="显示当前Git状态和配置信息"/>
+                    
+            <action id="GitMergeHelper.Settings"
+                    class="com.gitmergehelper.actions.OpenSettingsAction"
+                    text="配置设置"
+                    description="打开Git合并助手配置界面"/>
+        </group>
+        
+        <!-- 右键菜单 -->
+        <group id="GitMergeHelperContextGroup">
+            <reference ref="GitMergeHelperGroup"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="$Delete"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="$SearchWeb"/>
+        </group>
+        
+        <!-- Git工具栏 -->
+        <group id="GitMergeHelperToolbar">
+            <reference ref="GitMergeHelper.AutoMerge"/>
+            <reference ref="GitMergeHelper.QuickCommit"/>
+            <add-to-group group-id="Git.Menu" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin> 

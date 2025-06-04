@@ -1,9 +1,9 @@
 <idea-plugin>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <idea-version since-build="232" until-build="241.*" />
   <id>com.gitmergehelper.plugin</id>
   <name>Git合并助手</name>
-  <vendor email="support@gitmergehelper.com" url="https://github.com/gitmergehelper">Git Merge Helper Team</vendor>
+  <vendor email="1124822400@qq.com" url="https://github,com/Leo-Wei105/git-merge-helper-v2.git">Git Merge Helper Team</vendor>
   <icon>icons/icon.png</icon>
   <description><![CDATA[<h3>Git合并助手 - 自动化Git分支合并流程</h3>
         <p>一个强大的Git分支合并工具，帮助开发者自动化复杂的分支合并流程，提高开发效率。</p>
@@ -24,7 +24,13 @@
             <li>右键菜单：在项目树或编辑器中右键选择Git合并选项</li>
             <li>Git工具栏：点击Git面板中的合并助手按钮</li>
         </ul>]]></description>
-  <change-notes><![CDATA[<h4>版本 1.0.0</h4>
+  <change-notes><![CDATA[<h4>版本 1.1.0</h4>
+        <ul>
+            <li>功能优化和改进</li>
+            <li>提升用户体验</li>
+            <li>Bug修复和性能优化</li>
+        </ul>
+        <h4>版本 1.0.0</h4>
         <ul>
             <li>初始版本发布</li>
             <li>实现自动化分支合并功能</li>

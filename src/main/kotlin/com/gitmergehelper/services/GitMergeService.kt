@@ -588,4 +588,491 @@ class GitMergeService {
     private fun log(message: String) {
         println("[GitMergeHelper] $message")
     }
+    
+    /**
+     * 获取Git用户名
+     * 
+     * @param project 项目实例
+     * @return Git用户名，如果获取失败返回null
+     */
+    fun getGitUserName(project: Project): String? {
+        return try {
+            val repository = GitUtil.getRepositoryManager(project).repositories.firstOrNull()
+                ?: return null
+            
+            val handler = GitLineHandler(project, repository.root, GitCommand.CONFIG)
+            handler.addParameters("user.name")
+            val result = Git.getInstance().runCommand(handler)
+            
+            if (result.success() && result.output.isNotEmpty()) {
+                result.output.first().trim()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            log("获取Git用户名失败: ${e.message}")
+            null
+        }
+    }
+    
+    /**
+     * 创建并切换到新分支
+     * 
+     * @param project 项目实例
+     * @param branchName 新分支名称
+     * @param callback 结果回调
+     */
+    fun createAndCheckoutBranch(
+        project: Project,
+        branchName: String,
+        callback: (MergeResult) -> Unit
+    ) {
+        if (!isOperationInProgress.compareAndSet(false, true)) {
+            callback(MergeResult.failure("已有操作正在进行中，请稍后再试"))
+            return
+        }
+        
+        log("开始创建分支: $branchName")
+        
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "创建分支", true) {
+            override fun run(indicator: ProgressIndicator) {
+                try {
+                    val result = performCreateAndCheckoutBranch(project, branchName, indicator)
+                    log("创建分支结束，结果: ${result.message}")
+                    callback(result)
+                } finally {
+                    isOperationInProgress.set(false)
+                }
+            }
+        })
+    }
+    
+    /**
+     * 执行创建并切换分支的核心逻辑
+     * 
+     * @param project 项目实例
+     * @param branchName 新分支名称
+     * @param indicator 进度指示器
+     * @return 创建结果
+     */
+    private fun performCreateAndCheckoutBranch(
+        project: Project,
+        branchName: String,
+        indicator: ProgressIndicator
+    ): MergeResult {
+        try {
+            val repository = GitUtil.getRepositoryManager(project).repositories.firstOrNull()
+                ?: return MergeResult.failure("未找到Git仓库")
+            
+            // 1. 检查分支是否已存在
+            indicator.text = "检查分支是否存在..."
+            indicator.fraction = 0.2
+            
+            if (branchExists(project, repository, branchName)) {
+                return MergeResult.failure("分支 '$branchName' 已存在")
+            }
+            
+            // 2. 创建新分支
+            indicator.text = "创建新分支..."
+            indicator.fraction = 0.5
+            
+            val createResult = executeGitCommand(
+                project, 
+                repository, 
+                GitCommand.CHECKOUT, 
+                listOf("-b", branchName)
+            )
+            
+            if (!createResult.success) {
+                return MergeResult.failure("创建分支失败: ${createResult.message}")
+            }
+            
+            // 3. 验证分支创建成功
+            indicator.text = "验证分支创建..."
+            indicator.fraction = 0.8
+            
+            val currentBranch = repository.currentBranchName
+            if (currentBranch != branchName) {
+                return MergeResult.failure("分支创建失败，当前分支: $currentBranch")
+            }
+            
+            indicator.text = "分支创建完成"
+            indicator.fraction = 1.0
+            
+            return MergeResult.success("成功创建并切换到分支 '$branchName'")
+            
+        } catch (e: Exception) {
+            log("创建分支过程中发生异常: ${e.message}")
+            return MergeResult.failure("创建分支过程中发生异常: ${e.message}")
+        }
+    }
+    
+    /**
+     * 检查分支是否存在
+     * 
+     * @param project 项目实例
+     * @param repository Git仓库
+     * @param branchName 分支名称
+     * @return 分支是否存在
+     */
+    private fun branchExists(project: Project, repository: GitRepository, branchName: String): Boolean {
+        return try {
+            // 检查本地分支
+            val localHandler = GitLineHandler(project, repository.root, GitCommand.BRANCH)
+            localHandler.addParameters("--list", branchName)
+            val localResult = Git.getInstance().runCommand(localHandler)
+            
+            if (localResult.success() && localResult.output.any { 
+                val cleanBranch = it.trim().removePrefix("*").trim()
+                cleanBranch == branchName 
+            }) {
+                log("发现本地分支: $branchName")
+                return true
+            }
+            
+            // 检查远程分支
+            val remoteHandler = GitLineHandler(project, repository.root, GitCommand.BRANCH)
+            remoteHandler.addParameters("-r", "--list", "origin/$branchName")
+            val remoteResult = Git.getInstance().runCommand(remoteHandler)
+            
+            if (remoteResult.success() && remoteResult.output.any { 
+                it.trim().contains(branchName)
+            }) {
+                log("发现远程分支: origin/$branchName")
+                return true
+            }
+            
+            log("分支不存在: $branchName")
+            false
+            
+        } catch (e: Exception) {
+            log("检查分支存在性失败: ${e.message}")
+            false
+        }
+    }
+    
+    /**
+     * 获取所有分支列表
+     * 
+     * @param project 项目实例
+     * @return 分支名称列表
+     */
+    fun getAllBranches(project: Project): List<String> {
+        return try {
+            log("开始获取分支列表...")
+            
+            val repository = GitUtil.getRepositoryManager(project).repositories.firstOrNull()
+            if (repository == null) {
+                log("未找到Git仓库")
+                return emptyList()
+            }
+            
+            log("找到Git仓库: ${repository.root.path}")
+            
+            // 首先获取本地分支
+            val localBranches = getLocalBranches(project, repository)
+            log("获取到本地分支: $localBranches")
+            
+            // 然后尝试获取远程分支（如果失败，只返回本地分支）
+            val remoteBranches = try {
+                getRemoteBranches(project, repository)
+            } catch (e: Exception) {
+                log("获取远程分支失败，将只使用本地分支: ${e.message}")
+                emptyList()
+            }
+            log("获取到远程分支: $remoteBranches")
+            
+            // 合并并去重
+            val allBranches = (localBranches + remoteBranches)
+                .filter { branch ->
+                    branch.isNotEmpty() && 
+                    !branch.contains("HEAD") && 
+                    !branch.contains("->")
+                }
+                .distinct()
+                .sorted()
+            
+            log("合并后的分支列表: $allBranches")
+            
+            // 确保至少返回一些分支，优先使用所有获取到的分支
+            if (allBranches.isNotEmpty()) {
+                return allBranches
+            }
+            
+            // 如果都失败了，尝试使用更简单的方式获取分支列表
+            log("尝试使用简单方式获取分支列表...")
+            val simpleBranches = getSimpleBranchList(project, repository)
+            if (simpleBranches.isNotEmpty()) {
+                log("简单方式获取到分支: $simpleBranches")
+                return simpleBranches
+            }
+            
+            log("警告：未获取到任何分支，返回当前分支")
+            // 最后才fallback到当前分支
+            val currentBranch = repository.currentBranchName
+            if (currentBranch != null) {
+                log("返回当前分支作为默认: $currentBranch")
+                return listOf(currentBranch)
+            }
+            
+            emptyList()
+            
+        } catch (e: Exception) {
+            log("获取分支列表发生异常: ${e.message}")
+            log("异常堆栈: ${e.stackTraceToString()}")
+            emptyList()
+        }
+    }
+    
+    /**
+     * 获取本地分支列表
+     */
+    private fun getLocalBranches(project: Project, repository: GitRepository): List<String> {
+        return try {
+            val handler = GitLineHandler(project, repository.root, GitCommand.BRANCH)
+            val result = Git.getInstance().runCommand(handler)
+            
+            if (result.success()) {
+                result.output.map { line ->
+                    line.trim()
+                        .removePrefix("*")
+                        .trim()
+                }.filter { it.isNotEmpty() }
+            } else {
+                log("获取本地分支失败: ${result.errorOutputAsJoinedString}")
+                emptyList()
+            }
+        } catch (e: Exception) {
+            log("获取本地分支异常: ${e.message}")
+            emptyList()
+        }
+    }
+    
+    /**
+     * 获取远程分支列表
+     */
+    private fun getRemoteBranches(project: Project, repository: GitRepository): List<String> {
+        return try {
+            val handler = GitLineHandler(project, repository.root, GitCommand.BRANCH)
+            handler.addParameters("-r") // 只获取远程分支
+            val result = Git.getInstance().runCommand(handler)
+            
+            if (result.success()) {
+                result.output.map { line ->
+                    line.trim()
+                        .removePrefix("origin/")
+                        .removePrefix("remotes/origin/")
+                }.filter { branch ->
+                    branch.isNotEmpty() && !branch.contains("HEAD")
+                }
+            } else {
+                log("获取远程分支失败: ${result.errorOutputAsJoinedString}")
+                emptyList()
+            }
+        } catch (e: Exception) {
+            log("获取远程分支异常: ${e.message}")
+            emptyList()
+        }
+    }
+    
+    /**
+     * 获取当前分支名称
+     * 
+     * @param project 项目实例
+     * @return 当前分支名称，如果获取失败返回null
+     */
+    fun getCurrentBranch(project: Project): String? {
+        return try {
+            val repository = GitUtil.getRepositoryManager(project).repositories.firstOrNull()
+                ?: return null
+            
+            repository.currentBranchName
+        } catch (e: Exception) {
+            log("获取当前分支失败: ${e.message}")
+            null
+        }
+    }
+    
+    /**
+     * 基于指定分支创建并切换到新分支
+     * 
+     * @param project 项目实例
+     * @param branchName 新分支名称
+     * @param baseBranch 基分支名称
+     * @param callback 结果回调
+     */
+    fun createAndCheckoutBranchFromBase(
+        project: Project,
+        branchName: String,
+        baseBranch: String,
+        callback: (MergeResult) -> Unit
+    ) {
+        if (!isOperationInProgress.compareAndSet(false, true)) {
+            callback(MergeResult.failure("已有操作正在进行中，请稍后再试"))
+            return
+        }
+        
+        log("开始基于分支 '$baseBranch' 创建分支: $branchName")
+        
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "创建分支", true) {
+            override fun run(indicator: ProgressIndicator) {
+                try {
+                    val result = performCreateAndCheckoutBranchFromBase(project, branchName, baseBranch, indicator)
+                    log("创建分支结束，结果: ${result.message}")
+                    callback(result)
+                } finally {
+                    isOperationInProgress.set(false)
+                }
+            }
+        })
+    }
+    
+    /**
+     * 执行基于指定分支创建并切换分支的核心逻辑
+     * 
+     * @param project 项目实例
+     * @param branchName 新分支名称
+     * @param baseBranch 基分支名称
+     * @param indicator 进度指示器
+     * @return 创建结果
+     */
+    private fun performCreateAndCheckoutBranchFromBase(
+        project: Project,
+        branchName: String,
+        baseBranch: String,
+        indicator: ProgressIndicator
+    ): MergeResult {
+        try {
+            val repository = GitUtil.getRepositoryManager(project).repositories.firstOrNull()
+                ?: return MergeResult.failure("未找到Git仓库")
+            
+            // 1. 检查新分支是否已存在
+            indicator.text = "检查分支是否存在..."
+            indicator.fraction = 0.1
+            
+            if (branchExists(project, repository, branchName)) {
+                return MergeResult.failure("分支 '$branchName' 已存在")
+            }
+            
+            // 2. 验证基分支是否存在
+            indicator.text = "验证基分支..."
+            indicator.fraction = 0.2
+            
+            if (!branchExists(project, repository, baseBranch)) {
+                return MergeResult.failure("基分支 '$baseBranch' 不存在")
+            }
+            
+            // 3. 切换到基分支
+            indicator.text = "切换到基分支..."
+            indicator.fraction = 0.4
+            
+            val checkoutBaseResult = executeGitCommand(
+                project, 
+                repository, 
+                GitCommand.CHECKOUT, 
+                listOf(baseBranch)
+            )
+            
+            if (!checkoutBaseResult.success) {
+                return MergeResult.failure("切换到基分支失败: ${checkoutBaseResult.message}")
+            }
+            
+            // 4. 从基分支创建新分支
+            indicator.text = "创建新分支..."
+            indicator.fraction = 0.7
+            
+            val createResult = executeGitCommand(
+                project, 
+                repository, 
+                GitCommand.CHECKOUT, 
+                listOf("-b", branchName)
+            )
+            
+            if (!createResult.success) {
+                return MergeResult.failure("创建分支失败: ${createResult.message}")
+            }
+            
+            // 5. 验证分支创建成功
+            indicator.text = "验证分支创建..."
+            indicator.fraction = 0.9
+            
+            // 使用git命令获取当前分支名，而不是依赖repository对象
+            val currentBranch = getCurrentBranchByCommand(project, repository)
+            if (currentBranch != branchName) {
+                return MergeResult.failure("分支创建失败，当前分支: $currentBranch，期望分支: $branchName")
+            }
+            
+            indicator.text = "分支创建完成"
+            indicator.fraction = 1.0
+            
+            return MergeResult.success("成功基于分支 '$baseBranch' 创建并切换到分支 '$branchName'")
+            
+        } catch (e: Exception) {
+            log("创建分支过程中发生异常: ${e.message}")
+            return MergeResult.failure("创建分支过程中发生异常: ${e.message}")
+        }
+    }
+
+    /**
+     * 使用git命令获取当前分支名
+     * 
+     * @param project 项目实例
+     * @param repository Git仓库
+     * @return 当前分支名称
+     */
+    private fun getCurrentBranchByCommand(project: Project, repository: GitRepository): String? {
+        return try {
+            val handler = GitLineHandler(project, repository.root, GitCommand.BRANCH)
+            handler.addParameters("--show-current")
+            val result = Git.getInstance().runCommand(handler)
+            
+            if (result.success() && result.output.isNotEmpty()) {
+                result.output.first().trim()
+            } else {
+                // 如果上面的命令不支持，使用传统方式
+                val handler2 = GitLineHandler(project, repository.root, GitCommand.BRANCH)
+                val result2 = Git.getInstance().runCommand(handler2)
+                
+                if (result2.success()) {
+                    result2.output.find { it.startsWith("*") }?.trim()?.removePrefix("*")?.trim()
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            log("获取当前分支命令失败: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * 简单方式获取分支列表（不区分本地和远程）
+     */
+    private fun getSimpleBranchList(project: Project, repository: GitRepository): List<String> {
+        return try {
+            val handler = GitLineHandler(project, repository.root, GitCommand.BRANCH)
+            handler.addParameters("-a") // 获取所有分支（本地和远程）
+            val result = Git.getInstance().runCommand(handler)
+            
+            if (result.success()) {
+                result.output.map { line ->
+                    line.trim()
+                        .removePrefix("*")
+                        .removePrefix("remotes/origin/")
+                        .removePrefix("origin/")
+                        .trim()
+                }.filter { branch ->
+                    branch.isNotEmpty() && 
+                    !branch.contains("HEAD") &&
+                    !branch.contains("->")
+                }.distinct()
+            } else {
+                log("简单方式获取分支失败: ${result.errorOutputAsJoinedString}")
+                emptyList()
+            }
+        } catch (e: Exception) {
+            log("简单方式获取分支异常: ${e.message}")
+            emptyList()
+        }
+    }
 } 

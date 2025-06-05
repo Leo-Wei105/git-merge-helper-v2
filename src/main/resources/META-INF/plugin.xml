@@ -2,7 +2,6 @@
     <id>com.gitmergehelper.plugin</id>
     <name>Git合并助手</name>
     <vendor email="1124822400@qq.com" url="https://github,com/Leo-Wei105/git-merge-helper-v2.git">Git Merge Helper Team</vendor>
-    <icon>icons/icon.png</icon>
 
     <description><![CDATA[
         <h3>Git合并助手 - 自动化Git分支合并流程</h3>
@@ -86,6 +85,13 @@
                     class="com.gitmergehelper.actions.QuickCommitAction"
                     text="快速提交并合并"
                     description="快速提交当前更改并可选择继续合并"/>
+            
+            <action id="GitMergeHelper.CreateFeatureBranch"
+                    class="com.gitmergehelper.actions.CreateFeatureBranchAction"
+                    text="创建Feature分支"
+                    description="快捷创建feature分支，支持自定义前缀和描述">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift F"/>
+            </action>
                     
             <separator/>
             
@@ -112,6 +118,7 @@
         <group id="GitMergeHelperToolbar">
             <reference ref="GitMergeHelper.AutoMerge"/>
             <reference ref="GitMergeHelper.QuickCommit"/>
+            <reference ref="GitMergeHelper.CreateFeatureBranch"/>
             <add-to-group group-id="Git.Menu" anchor="last"/>
         </group>
     </actions>

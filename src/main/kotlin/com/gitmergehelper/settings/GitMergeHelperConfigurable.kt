@@ -4,6 +4,7 @@ import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.Messages
 import com.gitmergehelper.model.GitMergeConfig
 import com.gitmergehelper.model.TargetBranch
+import com.gitmergehelper.model.BranchPrefix
 import com.gitmergehelper.services.GitMergeHelperSettings
 import javax.swing.*
 import javax.swing.table.AbstractTableModel
@@ -21,10 +22,13 @@ class GitMergeHelperConfigurable : Configurable {
     
     private var mainPanel: JPanel? = null
     private var mainBranchField: JTextField? = null
+    private var customGitNameField: JTextField? = null
     private var targetBranchesTable: JTable? = null
     private var targetBranchesModel: TargetBranchTableModel? = null
     private var featurePatternsTable: JTable? = null
     private var featurePatternsModel: FeaturePatternsTableModel? = null
+    private var branchPrefixesTable: JTable? = null
+    private var branchPrefixesModel: BranchPrefixTableModel? = null
     
     private var config: GitMergeConfig = GitMergeConfig()
     
@@ -61,6 +65,9 @@ class GitMergeHelperConfigurable : Configurable {
         mainBranchField?.let { field ->
             config.mainBranch = field.text.trim()
         }
+        customGitNameField?.let { field ->
+            config.customGitName = field.text.trim()
+        }
     }
     
     /**
@@ -72,57 +79,96 @@ class GitMergeHelperConfigurable : Configurable {
         val contentPanel = JPanel(GridBagLayout())
         val gbc = GridBagConstraints()
         
-        // 主分支配置
+        // 基础配置
         gbc.gridx = 0
         gbc.gridy = 0
         gbc.gridwidth = 2
         gbc.fill = GridBagConstraints.HORIZONTAL
         gbc.insets = Insets(10, 10, 10, 10)
-        contentPanel.add(createMainBranchPanel(), gbc)
+        contentPanel.add(createBasicConfigPanel(), gbc)
+        
+        // 分支前缀配置
+        gbc.gridx = 0
+        gbc.gridy = 1
+        gbc.gridwidth = 1
+        gbc.weightx = 0.5
+        gbc.fill = GridBagConstraints.BOTH
+        gbc.insets = Insets(10, 10, 10, 5)
+        contentPanel.add(createBranchPrefixesPanel(), gbc)
         
         // 目标分支配置
+        gbc.gridx = 1
         gbc.gridy = 1
-        gbc.weighty = 0.4
+        gbc.gridwidth = 1
+        gbc.weightx = 0.5
         gbc.fill = GridBagConstraints.BOTH
+        gbc.insets = Insets(10, 5, 10, 10)
         contentPanel.add(createTargetBranchesPanel(), gbc)
         
         // 功能分支模式配置
+        gbc.gridx = 0
         gbc.gridy = 2
-        gbc.weighty = 0.4
+        gbc.gridwidth = 1
+        gbc.weightx = 0.5
+        gbc.fill = GridBagConstraints.BOTH
+        gbc.insets = Insets(10, 10, 10, 5)
         contentPanel.add(createFeaturePatternsPanel(), gbc)
         
         // 操作按钮
-        gbc.gridy = 3
-        gbc.weighty = 0.0
+        gbc.gridx = 1
+        gbc.gridy = 2
+        gbc.gridwidth = 1
+        gbc.weightx = 0.5
         gbc.fill = GridBagConstraints.HORIZONTAL
+        gbc.insets = Insets(10, 5, 10, 10)
         contentPanel.add(createActionPanel(), gbc)
         
         panel.add(contentPanel, BorderLayout.CENTER)
         return panel
     }
-    
     /**
-     * 创建主分支配置面板
+     * 创建基础配置面板
      */
-    private fun createMainBranchPanel(): JPanel {
+    private fun createBasicConfigPanel(): JPanel {
         val panel = JPanel(GridBagLayout())
-        panel.border = BorderFactory.createTitledBorder("主分支配置")
+        panel.border = BorderFactory.createTitledBorder("基础配置")
         
         val gbc = GridBagConstraints()
         gbc.insets = Insets(5, 5, 5, 5)
         
-        // 主分支标签
+        // 主分支标签和输入框
         gbc.gridx = 0
         gbc.gridy = 0
         gbc.anchor = GridBagConstraints.WEST
         panel.add(JLabel("主分支名称:"), gbc)
         
-        // 主分支输入框
         mainBranchField = JTextField(20)
         gbc.gridx = 1
         gbc.fill = GridBagConstraints.HORIZONTAL
         gbc.weightx = 1.0
         panel.add(mainBranchField!!, gbc)
+        
+        // 自定义Git用户名标签和输入框
+        gbc.gridx = 0
+        gbc.gridy = 1
+        gbc.weightx = 0.0
+        gbc.fill = GridBagConstraints.NONE
+        panel.add(JLabel("自定义Git用户名:"), gbc)
+        
+        customGitNameField = JTextField(20)
+        gbc.gridx = 1
+        gbc.fill = GridBagConstraints.HORIZONTAL
+        gbc.weightx = 1.0
+        panel.add(customGitNameField!!, gbc)
+        
+        // 帮助文本
+        gbc.gridx = 0
+        gbc.gridy = 2
+        gbc.gridwidth = 2
+        gbc.fill = GridBagConstraints.HORIZONTAL
+        val helpLabel = JLabel("<html><small>留空则使用全局Git配置的用户名</small></html>")
+        helpLabel.foreground = java.awt.Color.GRAY
+        panel.add(helpLabel, gbc)
         
         return panel
     }
@@ -137,7 +183,7 @@ class GitMergeHelperConfigurable : Configurable {
         // 创建表格模型和表格
         targetBranchesModel = TargetBranchTableModel()
         targetBranchesTable = JTable(targetBranchesModel!!)
-        targetBranchesTable!!.preferredScrollableViewportSize = Dimension(400, 150)
+        targetBranchesTable!!.preferredScrollableViewportSize = Dimension(400, 120)
         
         val scrollPane = JScrollPane(targetBranchesTable!!)
         panel.add(scrollPane, BorderLayout.CENTER)
@@ -167,7 +213,7 @@ class GitMergeHelperConfigurable : Configurable {
         // 创建表格模型和表格
         featurePatternsModel = FeaturePatternsTableModel()
         featurePatternsTable = JTable(featurePatternsModel!!)
-        featurePatternsTable!!.preferredScrollableViewportSize = Dimension(400, 150)
+        featurePatternsTable!!.preferredScrollableViewportSize = Dimension(400, 120)
         
         val scrollPane = JScrollPane(featurePatternsTable!!)
         panel.add(scrollPane, BorderLayout.CENTER)
@@ -182,6 +228,39 @@ class GitMergeHelperConfigurable : Configurable {
         
         buttonPanel.add(addButton)
         buttonPanel.add(removeButton)
+        panel.add(buttonPanel, BorderLayout.SOUTH)
+        
+        return panel
+    }
+    
+    /**
+     * 创建分支前缀配置面板
+     */
+    private fun createBranchPrefixesPanel(): JPanel {
+        val panel = JPanel(BorderLayout())
+        panel.border = BorderFactory.createTitledBorder("分支前缀配置")
+        
+        // 创建表格模型和表格
+        branchPrefixesModel = BranchPrefixTableModel()
+        branchPrefixesTable = JTable(branchPrefixesModel!!)
+        branchPrefixesTable!!.preferredScrollableViewportSize = Dimension(400, 120)
+        
+        val scrollPane = JScrollPane(branchPrefixesTable!!)
+        panel.add(scrollPane, BorderLayout.CENTER)
+        
+        // 创建按钮面板
+        val buttonPanel = JPanel()
+        val addButton = JButton("添加")
+        val removeButton = JButton("删除")
+        val setDefaultButton = JButton("设为默认")
+        
+        addButton.addActionListener { addBranchPrefix() }
+        removeButton.addActionListener { removeBranchPrefix() }
+        setDefaultButton.addActionListener { setDefaultBranchPrefix() }
+        
+        buttonPanel.add(addButton)
+        buttonPanel.add(removeButton)
+        buttonPanel.add(setDefaultButton)
         panel.add(buttonPanel, BorderLayout.SOUTH)
         
         return panel
@@ -205,8 +284,10 @@ class GitMergeHelperConfigurable : Configurable {
      */
     private fun updateUI() {
         mainBranchField?.text = config.mainBranch
+        customGitNameField?.text = config.customGitName
         targetBranchesModel?.fireTableDataChanged()
         featurePatternsModel?.fireTableDataChanged()
+        branchPrefixesModel?.fireTableDataChanged()
     }
     
     /**
@@ -253,6 +334,45 @@ class GitMergeHelperConfigurable : Configurable {
         if (selectedRow >= 0) {
             config.featureBranchPatterns.removeAt(selectedRow)
             featurePatternsModel?.fireTableDataChanged()
+        }
+    }
+    
+    /**
+     * 添加分支前缀
+     */
+    private fun addBranchPrefix() {
+        val prefix = Messages.showInputDialog("请输入分支前缀:", "添加分支前缀", Messages.getQuestionIcon())
+        if (!prefix.isNullOrBlank()) {
+            val description = Messages.showInputDialog("请输入前缀描述:", "添加分支前缀", Messages.getQuestionIcon()) ?: ""
+            config.branchPrefixes.add(BranchPrefix(prefix.trim(), description.trim()))
+            branchPrefixesModel?.fireTableDataChanged()
+        }
+    }
+    
+    /**
+     * 删除分支前缀
+     */
+    private fun removeBranchPrefix() {
+        val selectedRow = branchPrefixesTable?.selectedRow ?: -1
+        if (selectedRow >= 0) {
+            config.branchPrefixes.removeAt(selectedRow)
+            branchPrefixesModel?.fireTableDataChanged()
+        }
+    }
+    
+    /**
+     * 设置默认分支前缀
+     */
+    private fun setDefaultBranchPrefix() {
+        val selectedRow = branchPrefixesTable?.selectedRow ?: -1
+        if (selectedRow >= 0) {
+            // 先将所有前缀设为非默认
+            config.branchPrefixes.forEach { it.isDefault = false }
+            // 设置选中的为默认
+            config.branchPrefixes[selectedRow].isDefault = true
+            branchPrefixesModel?.fireTableDataChanged()
+        } else {
+            Messages.showWarningDialog("请先选择一个分支前缀", "设为默认")
         }
     }
     
@@ -321,6 +441,38 @@ class GitMergeHelperConfigurable : Configurable {
         
         override fun setValueAt(aValue: Any?, rowIndex: Int, columnIndex: Int) {
             config.featureBranchPatterns[rowIndex] = aValue.toString()
+            fireTableCellUpdated(rowIndex, columnIndex)
+        }
+    }
+    
+    /**
+     * 分支前缀表格模型
+     */
+    private inner class BranchPrefixTableModel : AbstractTableModel() {
+        private val columnNames = arrayOf("前缀", "描述", "默认")
+        
+        override fun getRowCount(): Int = config.branchPrefixes.size
+        override fun getColumnCount(): Int = columnNames.size
+        override fun getColumnName(column: Int): String = columnNames[column]
+        
+        override fun getValueAt(rowIndex: Int, columnIndex: Int): Any {
+            val prefix = config.branchPrefixes[rowIndex]
+            return when (columnIndex) {
+                0 -> prefix.prefix
+                1 -> prefix.description
+                2 -> if (prefix.isDefault) "是" else "否"
+                else -> ""
+            }
+        }
+        
+        override fun isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = columnIndex != 2 // 默认列不可编辑
+        
+        override fun setValueAt(aValue: Any?, rowIndex: Int, columnIndex: Int) {
+            val prefix = config.branchPrefixes[rowIndex]
+            when (columnIndex) {
+                0 -> prefix.prefix = aValue.toString()
+                1 -> prefix.description = aValue.toString()
+            }
             fireTableCellUpdated(rowIndex, columnIndex)
         }
     }

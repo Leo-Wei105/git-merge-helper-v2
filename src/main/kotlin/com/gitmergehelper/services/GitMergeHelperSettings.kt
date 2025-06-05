@@ -3,6 +3,7 @@ package com.gitmergehelper.services
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.*
 import com.gitmergehelper.model.GitMergeConfig
+import com.gitmergehelper.model.BranchPrefix
 import com.intellij.openapi.project.Project
 
 /**
@@ -23,6 +24,8 @@ class GitMergeHelperSettings : PersistentStateComponent<GitMergeHelperSettings.S
         var mainBranch: String = "main"
         var targetBranches: MutableList<TargetBranchState> = mutableListOf()
         var featureBranchPatterns: MutableList<String> = mutableListOf()
+        var branchPrefixes: MutableList<BranchPrefixState> = mutableListOf()
+        var customGitName: String = ""
         
         /**
          * 目标分支状态
@@ -35,6 +38,22 @@ class GitMergeHelperSettings : PersistentStateComponent<GitMergeHelperSettings.S
             constructor(name: String, description: String) {
                 this.name = name
                 this.description = description
+            }
+        }
+        
+        /**
+         * 分支前缀状态
+         */
+        class BranchPrefixState {
+            var prefix: String = ""
+            var description: String = ""
+            var isDefault: Boolean = false
+            
+            constructor()
+            constructor(prefix: String, description: String, isDefault: Boolean) {
+                this.prefix = prefix
+                this.description = description
+                this.isDefault = isDefault
             }
         }
     }
@@ -59,10 +78,22 @@ class GitMergeHelperSettings : PersistentStateComponent<GitMergeHelperSettings.S
     override fun loadState(state: State) {
         this.state = state
         
-        // 如果配置为空，加载默认配置
-        if (state.targetBranches.isEmpty() && state.featureBranchPatterns.isEmpty()) {
+        // 如果配置为空或未完整初始化，加载默认配置
+        if (shouldLoadDefaultConfig(state)) {
             loadDefaultConfig()
         }
+    }
+    
+    /**
+     * 判断是否应该加载默认配置
+     * 
+     * @param state 当前状态
+     * @return 是否需要加载默认配置
+     */
+    private fun shouldLoadDefaultConfig(state: State): Boolean {
+        return state.targetBranches.isEmpty() && 
+               state.featureBranchPatterns.isEmpty() && 
+               state.branchPrefixes.isEmpty()
     }
     
     /**
@@ -73,6 +104,7 @@ class GitMergeHelperSettings : PersistentStateComponent<GitMergeHelperSettings.S
     fun getConfig(): GitMergeConfig {
         val config = GitMergeConfig()
         config.mainBranch = state.mainBranch
+        config.customGitName = state.customGitName
         
         // 转换目标分支
         config.targetBranches.clear()
@@ -86,6 +118,14 @@ class GitMergeHelperSettings : PersistentStateComponent<GitMergeHelperSettings.S
         config.featureBranchPatterns.clear()
         config.featureBranchPatterns.addAll(state.featureBranchPatterns)
         
+        // 转换分支前缀
+        config.branchPrefixes.clear()
+        config.branchPrefixes.addAll(
+            state.branchPrefixes.map {
+                BranchPrefix(it.prefix, it.description, it.isDefault)
+            }
+        )
+        
         return config
     }
     
@@ -96,6 +136,7 @@ class GitMergeHelperSettings : PersistentStateComponent<GitMergeHelperSettings.S
      */
     fun saveConfig(config: GitMergeConfig) {
         state.mainBranch = config.mainBranch
+        state.customGitName = config.customGitName
         
         // 转换目标分支
         state.targetBranches.clear()
@@ -108,6 +149,14 @@ class GitMergeHelperSettings : PersistentStateComponent<GitMergeHelperSettings.S
         // 转换功能分支模式
         state.featureBranchPatterns.clear()
         state.featureBranchPatterns.addAll(config.featureBranchPatterns)
+        
+        // 转换分支前缀
+        state.branchPrefixes.clear()
+        state.branchPrefixes.addAll(
+            config.branchPrefixes.map {
+                State.BranchPrefixState(it.prefix, it.description, it.isDefault)
+            }
+        )
     }
     
     /**

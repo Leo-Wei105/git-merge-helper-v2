@@ -82,47 +82,47 @@ class GitMergeHelperConfigurable : Configurable {
         // 基础配置
         gbc.gridx = 0
         gbc.gridy = 0
-        gbc.gridwidth = 2
-        gbc.fill = GridBagConstraints.HORIZONTAL
-        gbc.insets = Insets(10, 10, 10, 10)
+        gbc.gridwidth = 1
+        gbc.weightx = 0.5
+        gbc.fill = GridBagConstraints.BOTH
+        gbc.insets = Insets(10, 10, 10, 5)
         contentPanel.add(createBasicConfigPanel(), gbc)
         
         // 分支前缀配置
-        gbc.gridx = 0
-        gbc.gridy = 1
+        gbc.gridx = 1
+        gbc.gridy = 0
         gbc.gridwidth = 1
         gbc.weightx = 0.5
         gbc.fill = GridBagConstraints.BOTH
-        gbc.insets = Insets(10, 10, 10, 5)
+        gbc.insets = Insets(10, 5, 10, 10)
         contentPanel.add(createBranchPrefixesPanel(), gbc)
         
         // 目标分支配置
+        gbc.gridx = 0
+        gbc.gridy = 1
+        gbc.gridwidth = 1
+        gbc.weightx = 0.5
+        gbc.fill = GridBagConstraints.BOTH
+        gbc.insets = Insets(10, 10, 10, 5)
+        contentPanel.add(createTargetBranchesPanel(), gbc)
+        
+        // 功能分支模式配置
         gbc.gridx = 1
         gbc.gridy = 1
         gbc.gridwidth = 1
         gbc.weightx = 0.5
         gbc.fill = GridBagConstraints.BOTH
         gbc.insets = Insets(10, 5, 10, 10)
-        contentPanel.add(createTargetBranchesPanel(), gbc)
-        
-        // 功能分支模式配置
-        gbc.gridx = 0
-        gbc.gridy = 2
-        gbc.gridwidth = 1
-        gbc.weightx = 0.5
-        gbc.fill = GridBagConstraints.BOTH
-        gbc.insets = Insets(10, 10, 10, 5)
         contentPanel.add(createFeaturePatternsPanel(), gbc)
         
         // 操作按钮
-        gbc.gridx = 1
+        gbc.gridx = 0
         gbc.gridy = 2
-        gbc.gridwidth = 1
-        gbc.weightx = 0.5
+        gbc.gridwidth = 2
+        gbc.weightx = 1.0
         gbc.fill = GridBagConstraints.HORIZONTAL
-        gbc.insets = Insets(10, 5, 10, 10)
+        gbc.insets = Insets(10, 10, 10, 10)
         contentPanel.add(createActionPanel(), gbc)
-        
         panel.add(contentPanel, BorderLayout.CENTER)
         return panel
     }
